@@ -1,0 +1,78 @@
+version: '3'
+services:
+  api:
+    container_name: async_api
+    build: src
+    env_file:
+      - src/.env
+    environment:
+      - TEST=False
+    depends_on:
+      - postgres_etl
+      - elastic_etl
+      - redis_etl
+    networks:
+      - etl_network
+    ports:
+      - '8000:8000'
+    restart: always
+
+  etl:
+    container_name: main_etl
+    build: etl
+    env_file:
+      - etl/.env
+    depends_on:
+      - postgres_etl
+    networks:
+      - etl_network
+    restart: always
+
+  postgres_etl:
+    image: postgres:15
+    container_name: postgres_etl
+    env_file:
+      - etl/.env
+    environment:
+      REDIS_HOST: redis_etl
+      REDIS_PORT: 6379
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./pg_data:/var/lib/postgresql2/data
+      - ./sql/script.sql:/docker-entrypoint-initdb.d/script.sql
+    networks:
+      - etl_network
+
+  elastic_etl:
+      image: elasticsearch:8.2.2
+      container_name: elastic_etl
+      environment:
+        - discovery.type=single-node
+        - xpack.security.enabled=false
+        - 'ES_JAVA_OPTS=-Xms512m -Xmx512m'
+      networks:
+        - etl_network
+
+  redis_etl:
+    image: redis
+    container_name: redis_etl
+    networks:
+      - etl_network
+
+  nginx:
+    image: nginx:1.19.2
+    container_name: api-nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/configs:/etc/nginx/conf.d:ro
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    networks:
+      - etl_network
+
+networks:
+  etl_network:
+    driver: bridge

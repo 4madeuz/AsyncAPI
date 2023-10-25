@@ -1,0 +1,45 @@
+version: '3'
+services:
+    api_test:
+      container_name: async_api_test
+      build: ../src
+      env_file: ../src/.env.test
+      environment:
+        - TEST=True
+      networks:
+        - test
+      ports:
+        - '8000:8000'
+      restart: always
+
+    redis_test:
+      image: redis
+      container_name: redis_test
+      networks:
+        - test
+
+    elastic_test:
+      image: elasticsearch:8.2.2
+      container_name: elastic_test
+      environment:
+        - discovery.type=single-node
+        - xpack.security.enabled=false
+        - 'ES_JAVA_OPTS=-Xms512m -Xmx512m'
+      networks:
+        - test
+
+    tests:
+      container_name: test_python_service
+      build: .
+      env_file:
+        - ./functional/.env
+      entrypoint: >
+            sh -c "python functional/utils/wait_for_es.py
+            && python functional/utils/wait_for_redis.py
+            && pytest -s functional/src"
+      networks:
+        - test
+
+networks:
+  test:
+    driver: bridge
