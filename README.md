@@ -1,5 +1,6 @@
 # Запуск
 docker-compose up -d --build
+
 docker-compose up
 Для запуска тестов заустить docker-compose из директории tests
 # Описание
